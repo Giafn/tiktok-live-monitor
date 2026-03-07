@@ -61,14 +61,20 @@ app.prepare().then(() => {
 
       socket.emit('status', { type: 'connecting', message: `Menghubungkan ke @${cleanUsername}...` });
 
-      // Create connection dengan options yang benar
+      // Create connection dengan opsi yang benar untuk menghindari error websocket
       const tiktokConnection = new WebcastPushConnection(cleanUsername, {
         processInitialData: false,
         enableExtendedGiftInfo: true,
         requestPollingIntervalMs: 2000,
+        // Gunakan fetchRoomInfoOnConnect untuk mencegah koneksi ke room offline
+        fetchRoomInfoOnConnect: true,
+        // WebcastPushConnection akan otomatis fallback ke polling jika websocket gagal
         webClientParams: {
           app_language: 'id-ID',
           device_platform: 'web',
+        },
+        webClientHeaders: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
       });
 
@@ -108,9 +114,20 @@ app.prepare().then(() => {
         clearTimeout(connectTimeout);
         console.error('[TikTok] ✗ Connection failed:', err.message);
         console.error('[TikTok] Full error:', err);
+
+        // Handle error spesifik untuk websocket upgrade
+        let errorMessage = err.message || 'User mungkin tidak sedang live.';
+        if (err.message && err.message.includes('websocket upgrade')) {
+          errorMessage = 'TikTok membatasi koneksi tanpa login. Coba gunakan username lain atau tunggu streamer lain yang lebih populer.';
+        } else if (err.message && err.message.includes('Cannot read room')) {
+          errorMessage = 'Username tidak ditemukan atau user tidak sedang live.';
+        } else if (err.message && err.message.includes('captcha')) {
+          errorMessage = 'TikTok mendeteksi aktivitas mencurigakan. Coba lagi dalam beberapa menit.';
+        }
+
         socket.emit('status', {
           type: 'error',
-          message: `Gagal terhubung: ${err.message || 'User mungkin tidak sedang live.'}`,
+          message: `Gagal terhubung: ${errorMessage}`,
         });
         activeConnections.delete(socket.id);
         return;
