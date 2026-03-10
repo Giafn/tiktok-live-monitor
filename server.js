@@ -108,12 +108,21 @@ app.prepare().then(() => {
 
         // Extract stream URL dari roomInfo
         let streamUrl = null;
-        if (state.roomInfo && state.roomInfo.stream_url) {
-          streamUrl = state.roomInfo.stream_url.rtmp_pull_url ||
-                      state.roomInfo.stream_url.hls_pull_url ||
-                      state.roomInfo.stream_url.live_core_sdk_data?.pull_data?.stream_data || null;
-          console.log('[TikTok] Stream URL:', streamUrl);
+        console.log('[TikTok] roomInfo keys:', state.roomInfo ? Object.keys(state.roomInfo) : 'null');
+
+        if (state.roomInfo) {
+          if (state.roomInfo.stream_url) {
+            console.log('[TikTok] stream_url keys:', Object.keys(state.roomInfo.stream_url));
+            console.log('[TikTok] stream_url:', JSON.stringify(state.roomInfo.stream_url, null, 2));
+            streamUrl = state.roomInfo.stream_url.rtmp_pull_url ||
+                        state.roomInfo.stream_url.hls_pull_url ||
+                        state.roomInfo.stream_url.live_core_sdk_data?.pull_data?.stream_data || null;
+          } else {
+            console.log('[TikTok] No stream_url in roomInfo');
+          }
         }
+
+        console.log('[TikTok] Final Stream URL:', streamUrl);
 
         socket.emit('status', {
           type: 'connected',
