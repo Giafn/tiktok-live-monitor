@@ -133,6 +133,9 @@ export default function Home() {
   const [status, setStatus] = useState<StatusEvent | null>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const [totalLikes, setTotalLikes] = useState(0);
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -150,8 +153,16 @@ export default function Home() {
 
     socket.on('status', (data: StatusEvent) => {
       setStatus(data);
-      if (data.type === 'connected') setIsConnected(true);
-      if (data.type === 'disconnected' || data.type === 'error') setIsConnected(false);
+      if (data.type === 'connected') {
+        setIsConnected(true);
+        if (data.roomId) setRoomId(data.roomId);
+        if (data.streamUrl) setStreamUrl(data.streamUrl);
+      }
+      if (data.type === 'disconnected' || data.type === 'error') {
+        setIsConnected(false);
+        setRoomId(null);
+        setStreamUrl(null);
+      }
     });
 
     socket.on('new-chat', (data: ChatMessage) => {
@@ -180,6 +191,8 @@ export default function Home() {
     setFeed([]);
     setViewerCount(0);
     setTotalLikes(0);
+    setRoomId(null);
+    setStreamUrl(null);
     setStatus({ type: 'connecting', message: `Menghubungkan ke @${username.replace('@', '')}...` });
     socketRef.current.emit('join-room', username.replace('@', '').trim());
   };
@@ -187,6 +200,24 @@ export default function Home() {
   const handleDisconnect = () => {
     socketRef.current?.emit('leave-room');
     setIsConnected(false);
+    setRoomId(null);
+    setStreamUrl(null);
+  };
+
+  const handleCopyRoomId = async () => {
+    if (roomId) {
+      await navigator.clipboard.writeText(roomId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleCopyStreamUrl = async () => {
+    if (streamUrl) {
+      await navigator.clipboard.writeText(streamUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -298,22 +329,50 @@ export default function Home() {
         >
           {/* Chat header */}
           <div
-            className="px-4 py-3 border-b flex items-center justify-between"
+            className="px-4 py-3 border-b flex items-center justify-between gap-3"
             style={{ borderColor: 'var(--border)' }}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
               <span className="text-xs font-semibold text-white/40 uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)' }}>
                 Live Chat
               </span>
-              {feed.length > 0 && (
-                <span
-                  className="text-[10px] px-1.5 py-0.5 rounded-md font-mono tabular-nums"
-                  style={{ background: 'rgba(254,44,85,0.15)', color: '#FE2C55' }}
-                >
-                  {feed.length}
-                </span>
+              {streamUrl && (
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div
+                    className="flex-1 flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-mono"
+                    style={{ background: 'rgba(37,244,238,0.1)', border: '1px solid rgba(37,244,238,0.2)' }}
+                  >
+                    <svg className="w-3 h-3 text-cyan-400/50 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-cyan-400/70 truncate" title={streamUrl}>Stream URL</span>
+                  </div>
+                  <button
+                    onClick={handleCopyStreamUrl}
+                    className="flex-shrink-0 p-1.5 rounded-md transition-all hover:bg-white/10"
+                    title="Copy Stream URL"
+                  >
+                    {copied ? (
+                      <svg className="w-3.5 h-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
+            {feed.length > 0 && (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded-md font-mono tabular-nums flex-shrink-0"
+                style={{ background: 'rgba(254,44,85,0.15)', color: '#FE2C55' }}
+              >
+                {feed.length}
+              </span>
+            )}
           </div>
 
           {/* Feed - Chat baru di bawah, overflow hidden di atas */}

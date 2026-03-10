@@ -28,6 +28,7 @@ export interface StatusEvent {
   type: 'connecting' | 'connected' | 'disconnected' | 'error';
   message: string;
   roomId?: string;
+  streamUrl?: string | null;
 }
 
 export type FeedItem =

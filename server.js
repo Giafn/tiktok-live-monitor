@@ -105,10 +105,21 @@ app.prepare().then(() => {
         const state = await tiktokConnection.connect();
         clearTimeout(connectTimeout);
         console.log(`[TikTok] ✓ Connected to room: ${state.roomId} for user: ${cleanUsername}`);
+
+        // Extract stream URL dari roomInfo
+        let streamUrl = null;
+        if (state.roomInfo && state.roomInfo.stream_url) {
+          streamUrl = state.roomInfo.stream_url.rtmp_pull_url ||
+                      state.roomInfo.stream_url.hls_pull_url ||
+                      state.roomInfo.stream_url.live_core_sdk_data?.pull_data?.stream_data || null;
+          console.log('[TikTok] Stream URL:', streamUrl);
+        }
+
         socket.emit('status', {
           type: 'connected',
           message: `Terhubung ke live @${cleanUsername}`,
           roomId: state.roomId,
+          streamUrl: streamUrl,
         });
       } catch (err) {
         clearTimeout(connectTimeout);
