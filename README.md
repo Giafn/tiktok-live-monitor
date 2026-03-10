@@ -14,6 +14,7 @@ Monitor TikTok Live chat, gift, dan viewer count secara real-time dengan video s
 - ❤️ **Like Counter** - Hitung total like yang diterima
 - 👥 **Viewer Count** - Lihat jumlah viewers secara real-time
 - 🎨 **Modern UI** - Interface bersih dengan Tailwind CSS
+- 📡 **Webhook Support** - Integrasikan event ke aplikasi eksternal
 
 ## 🛠️ Tech Stack
 
@@ -88,6 +89,18 @@ npm start
 4. Tunggu hingga terhubung - video stream, chat, gift, dan viewer count akan muncul real-time
 5. Klik **Disconnect** untuk keluar dari room
 
+## 🔌 Webhook Integration
+
+Untuk mengintegrasikan event ke aplikasi eksternal (Discord, database, dll):
+
+1. Klik icon **⚙️ Settings** di header
+2. Masukkan URL webhook Anda (contoh: `https://your-api.com/webhook`)
+3. Klik **Save**
+4. Connect ke live TikTok
+5. Event `chat` dan `gift` akan dikirim ke webhook Anda
+
+📄 **Dokumentasi lengkap:** [WEBHOOK_DOCS.md](WEBHOOK_DOCS.md)
+
 ## 🏗️ Arsitektur
 
 ```
@@ -125,6 +138,8 @@ tiktok-live-monitor/
 │   │   ├── ChatSection.tsx    # Chat feed display
 │   │   ├── ConnectionForm.tsx # Username input & connect button
 │   │   ├── StatsBar.tsx       # Viewer/like/message counter
+│   │   ├── Header.tsx         # Navbar dengan settings button
+│   │   ├── SettingsModal.tsx  # Modal webhook settings
 │   │   └── ...
 │   ├── hooks/
 │   │   └── useTikTokSocket.ts # Socket.io client hook
@@ -135,7 +150,8 @@ tiktok-live-monitor/
 │   └── flv.d.ts               # FLV.js type definitions
 ├── server.js                  # Custom Express + Socket.io server
 ├── package.json
-└── README.md
+├── README.md
+└── WEBHOOK_DOCS.md            # Dokumentasi webhook integration
 ```
 
 ## 🔌 Socket Events
