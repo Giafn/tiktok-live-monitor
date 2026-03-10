@@ -13,12 +13,12 @@ export function ChatSection({
 
   return (
     <div
-      className="rounded-2xl border flex flex-col overflow-hidden"
+      className="rounded-2xl border flex flex-col overflow-hidden flex-1 min-h-0"
       style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
     >
       {/* Chat header */}
       <div
-        className="px-4 py-3 border-b flex items-center justify-between gap-3"
+        className="px-4 py-3 border-b flex items-center justify-between gap-3 flex-shrink-0"
         style={{ borderColor: 'var(--border)' }}
       >
         <span className="text-xs font-semibold text-white/40 uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)' }}>
@@ -37,8 +37,7 @@ export function ChatSection({
       {/* Feed */}
       <div
         ref={chatContainerRef}
-        className="overflow-hidden flex flex-col justify-end p-2"
-        style={{ maxHeight: 'calc(100vh - 280px)', minHeight: '400px' }}
+        className="overflow-hidden flex flex-col justify-end p-2 flex-1 min-h-0"
       >
         <div className="overflow-y-auto space-y-0.5 scrollbar-hide">
           {feed.length === 0 ? (

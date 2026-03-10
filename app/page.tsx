@@ -82,24 +82,12 @@ export default function Home() {
 
       {/* ── Main ── */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 flex flex-col gap-4">
-        {/* ── Connection Form ── */}
-        <div className="flex justify-center">
-          <ConnectionForm
-            username={username}
-            onUsernameChange={setUsername}
-            isConnected={isConnected}
-            onConnect={handleConnect}
-            onDisconnect={handleDisconnect}
-            status={status}
-          />
-        </div>
-
         {/* ── Content: Video + Chat (Responsive Grid) ── */}
         {isConnected && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Video Player Section */}
-            <div className="rounded-2xl border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-              <div className="flex items-center gap-2 mb-3">
+          <div className="flex-1 flex flex-col lg:flex-row gap-4">
+            {/* Video Player Section - Full height */}
+            <div className="rounded-2xl border p-4 flex-1 flex flex-col lg:h-screen" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+              <div className="flex items-center gap-2 mb-3 shrink-0">
                 <span className="text-xs font-semibold text-white/40 uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)' }}>
                   Live Stream
                 </span>
@@ -109,13 +97,39 @@ export default function Home() {
                   <span className="text-cyan-400/70">LIVE</span>
                 </div>
               </div>
-              <VideoPlayer streamUrl={streamUrl} username={username} />
+              <div className="flex-1 min-h-0">
+                <VideoPlayer streamUrl={streamUrl} username={username} />
+              </div>
             </div>
 
-            {/* Chat Section */}
-            <ChatSection
-              feed={feed}
+            {/* Chat Section - With Connection Form on top */}
+            <div className="flex flex-col gap-4">
+              <ConnectionForm
+                username={username}
+                onUsernameChange={setUsername}
+                isConnected={isConnected}
+                onConnect={handleConnect}
+                onDisconnect={handleDisconnect}
+                status={status}
+              />
+              <ChatSection
+                feed={feed}
+                isConnected={isConnected}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Connection Form when not connected */}
+        {!isConnected && (
+          <div className="flex justify-center">
+            <ConnectionForm
+              username={username}
+              onUsernameChange={setUsername}
               isConnected={isConnected}
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              status={status}
             />
           </div>
         )}
