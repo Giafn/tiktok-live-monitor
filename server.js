@@ -12,6 +12,31 @@ const port = process.env.PORT || 3000;
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
+// Store webhook URL per socket
+const webhookUrls = new Map();
+
+// HTTP POST helper for webhook
+async function sendWebhook(url, payload) {
+  if (!url) {
+    console.log('[Webhook] No URL configured, skipping');
+    return;
+  }
+
+  console.log(`[Webhook] Sending ${payload.type} to ${url}`);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(5000), // 5s timeout
+    });
+    console.log(`[Webhook] Sent to ${url}: ${payload.type}, status: ${response.status}`);
+  } catch (err) {
+    console.error(`[Webhook] Failed to send to ${url}:`, err.message);
+  }
+}
+
 app.prepare().then(() => {
   const httpServer = createServer(async (req, res) => {
     try {
@@ -39,6 +64,17 @@ app.prepare().then(() => {
 
   io.on('connection', (socket) => {
     console.log(`[Socket] Client connected: ${socket.id}`);
+
+    // Handle webhook URL setup
+    socket.on('set-webhook', (url) => {
+      if (url) {
+        webhookUrls.set(socket.id, url);
+        console.log(`[Webhook] URL set for socket ${socket.id}: ${url}`);
+      } else {
+        webhookUrls.delete(socket.id);
+        console.log(`[Webhook] URL removed for socket ${socket.id}`);
+      }
+    });
 
     socket.on('join-room', async (tiktokUsername) => {
       // Clean username
@@ -80,6 +116,9 @@ app.prepare().then(() => {
 
       activeConnections.set(socket.id, tiktokConnection);
 
+      // Store roomId for webhook
+      let roomId = null;
+
       // Setup event listeners BEFORE connect
       tiktokConnection.on('connecting', () => {
         console.log('[TikTok] connecting event triggered');
@@ -104,6 +143,7 @@ app.prepare().then(() => {
         console.log(`[TikTok] Calling connect() for @${cleanUsername}...`);
         const state = await tiktokConnection.connect();
         clearTimeout(connectTimeout);
+        roomId = state.roomId; // Store roomId for later use
         console.log(`[TikTok] ✓ Connected to room: ${state.roomId} for user: ${cleanUsername}`);
 
         // Extract stream URL dari roomInfo
@@ -156,14 +196,27 @@ app.prepare().then(() => {
       // Forward chat messages - struktur data sesuai dengan WebcastPushConnection
       tiktokConnection.on('chat', (data) => {
         console.log('[TikTok] chat event received:', data);
-        socket.emit('new-chat', {
-          id: uuidv4(),
-          uniqueId: data.uniqueId || 'unknown',
-          nickname: data.nickname || data.uniqueId || 'Unknown',
-          comment: data.comment || '',
-          profilePictureUrl: data.profilePictureUrl || '',
-          timestamp: Date.now(),
-        });
+
+        const chatPayload = {
+          type: 'chat',
+          roomId: roomId,
+          data: {
+            id: uuidv4(),
+            uniqueId: data.uniqueId || 'unknown',
+            nickname: data.nickname || data.uniqueId || 'Unknown',
+            comment: data.comment || '',
+            profilePictureUrl: data.profilePictureUrl || '',
+            timestamp: Date.now(),
+          },
+        };
+
+        // Send to socket client
+        socket.emit('new-chat', chatPayload.data);
+
+        // Send to webhook
+        const webhookUrl = webhookUrls.get(socket.id);
+        console.log('[Webhook] Getting URL for socket', socket.id, ':', webhookUrl);
+        sendWebhook(webhookUrl, chatPayload);
       });
 
       // Forward gifts
@@ -173,15 +226,27 @@ app.prepare().then(() => {
         if (data.giftType === 1 && !data.repeatEnd) {
           return;
         }
-        socket.emit('new-gift', {
-          id: uuidv4(),
-          uniqueId: data.uniqueId || 'unknown',
-          nickname: data.nickname || data.uniqueId || 'Unknown',
-          giftName: data.giftName || 'Gift',
-          repeatCount: data.repeatCount || 1,
-          profilePictureUrl: data.profilePictureUrl || '',
-          timestamp: Date.now(),
-        });
+
+        const giftPayload = {
+          type: 'gift',
+          roomId: roomId,
+          data: {
+            id: uuidv4(),
+            uniqueId: data.uniqueId || 'unknown',
+            nickname: data.nickname || data.uniqueId || 'Unknown',
+            giftName: data.giftName || 'Gift',
+            repeatCount: data.repeatCount || 1,
+            profilePictureUrl: data.profilePictureUrl || '',
+            timestamp: Date.now(),
+          },
+        };
+
+        // Send to socket client
+        socket.emit('new-gift', giftPayload.data);
+
+        // Send to webhook
+        const webhookUrl = webhookUrls.get(socket.id);
+        sendWebhook(webhookUrl, giftPayload);
       });
 
       // Forward likes

@@ -69,5 +69,9 @@ export function useTikTokSocket({
     socketRef.current?.emit('leave-room');
   };
 
-  return { socket: socketRef, joinRoom, leaveRoom, MAX_FEED };
+  const setWebhook = (url: string) => {
+    socketRef.current?.emit('set-webhook', url);
+  };
+
+  return { socket: socketRef, joinRoom, leaveRoom, setWebhook, MAX_FEED };
 }

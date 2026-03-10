@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Header, StatsBar, ConnectionForm, ChatSection, VideoPlayer } from './components';
+import { useState, useEffect } from 'react';
+import { Header, StatsBar, ConnectionForm, ChatSection, VideoPlayer, SettingsModal } from './components';
 import { useTikTokSocket } from './hooks';
 import type { StatusEvent, ChatMessage, GiftEvent, LikeEvent, FeedItem } from './types';
 
@@ -18,6 +18,8 @@ export default function Home() {
   const [totalLikes, setTotalLikes] = useState(0);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const { socket, joinRoom, leaveRoom } = useTikTokSocket({
     onStatus: (data: StatusEvent) => {
@@ -71,10 +73,18 @@ export default function Home() {
 
   const chatCount = feed.filter((f) => f.kind === 'chat').length;
 
+  // Send webhook URL to server when it changes
+  useEffect(() => {
+    if (webhookUrl) {
+      socket.current?.emit('set-webhook', webhookUrl);
+      console.log('[Page] Webhook URL updated:', webhookUrl);
+    }
+  }, [webhookUrl]);
+
   return (
     <div className="min-h-screen flex flex-col" style={{ fontFamily: 'var(--font-body)' }}>
       {/* ── Navbar ── */}
-      <Header>
+      <Header onSettingsClick={() => setIsSettingsOpen(true)}>
         {isConnected && (
           <StatsBar viewerCount={viewerCount} totalLikes={totalLikes} messageCount={chatCount} />
         )}
@@ -139,6 +149,14 @@ export default function Home() {
           Data live dari TikTok WebCast API • Max {MAX_FEED} pesan tersimpan
         </p>
       </main>
+
+      {/* Webhook Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        webhookUrl={webhookUrl}
+        onSave={setWebhookUrl}
+      />
     </div>
   );
 }

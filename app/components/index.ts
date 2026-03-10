@@ -6,3 +6,4 @@ export { Header } from './Header';
 export { ConnectionForm } from './ConnectionForm';
 export { ChatSection } from './ChatSection';
 export { VideoPlayer } from './VideoPlayer';
+export { SettingsModal } from './SettingsModal';
