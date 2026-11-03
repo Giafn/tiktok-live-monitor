@@ -2,7 +2,7 @@
 
 Monitor TikTok Live chat, gift, dan viewer count secara real-time dengan video stream langsung.
 
-![Stack](https://img.shields.io/badge/Next.js-14-black?logo=next.js)
+![Stack](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
 ![Socket.io](https://img.shields.io/badge/Socket.io-4-red?logo=socket.io)
 
@@ -20,26 +20,26 @@ Monitor TikTok Live chat, gift, dan viewer count secara real-time dengan video s
 
 | Kategori | Package |
 |----------|---------|
-| **Framework** | Next.js 14 (App Router) |
+| **Framework** | Next.js 16 (App Router, Turbopack) |
 | **Language** | TypeScript |
-| **Server** | Express + Socket.io |
-| **Styling** | Tailwind CSS |
+| **Server** | Node.js HTTP + Socket.io |
+| **Styling** | Tailwind CSS 4 |
 | **Video Player** | flv.js |
-| **TikTok Connector** | tiktok-live-connector |
+| **TikTok Connector** | tiktok-live-connector 2 |
 
 ### Dependencies
 
 ```json
 {
-  "next": "14.2.0",
-  "react": "^18",
-  "react-dom": "^18",
-  "express": "^4.18.3",
-  "socket.io": "^4.7.4",
-  "socket.io-client": "^4.7.4",
-  "tiktok-live-connector": "^1.1.15",
+  "next": "^16.4.4",
+  "react": "^19.3.1",
+  "react-dom": "^19.3.1",
+  "express": "^5.3.0",
+  "socket.io": "^4.8.4",
+  "socket.io-client": "^4.8.4",
+  "tiktok-live-connector": "^2.5.0",
   "flv.js": "^1.6.2",
-  "uuid": "^9.0.1"
+  "uuid": "^14.0.3"
 }
 ```
 
@@ -48,13 +48,12 @@ Monitor TikTok Live chat, gift, dan viewer count secara real-time dengan video s
 ```json
 {
   "typescript": "^5",
-  "@types/node": "^20",
-  "@types/react": "^18",
-  "@types/react-dom": "^18",
-  "@types/uuid": "^9",
-  "tailwindcss": "^3.4.1",
-  "postcss": "^8",
-  "autoprefixer": "^10"
+  "@types/node": "^26",
+  "@types/react": "^19",
+  "@types/react-dom": "^19",
+  "tailwindcss": "^4",
+  "@tailwindcss/postcss": "^4",
+  "postcss": "^8"
 }
 ```
 
@@ -117,7 +116,7 @@ Untuk mengintegrasikan event ke aplikasi eksternal (Discord, database, dll):
 └─────────────────────────────────────────────────────┘
                          ↕ WebSocket
 ┌─────────────────────────────────────────────────────┐
-│              server.js (Express + Socket.io)         │
+│              server.js (Node.js + Socket.io)         │
 │  ┌──────────────────┐    ┌──────────────────────┐   │
 │  │  Socket.io Server│ ←→ │ TikTokLiveConnector  │   │
 │  │  - Broadcast     │    │ - Connect to TikTok  │   │
@@ -148,7 +147,7 @@ tiktok-live-monitor/
 │   └── page.tsx               # Main page
 ├── types/
 │   └── flv.d.ts               # FLV.js type definitions
-├── server.js                  # Custom Express + Socket.io server
+├── server.js                  # Custom Node.js + Socket.io server
 ├── package.json
 ├── README.md
 └── WEBHOOK_DOCS.md            # Dokumentasi webhook integration
@@ -176,9 +175,10 @@ tiktok-live-monitor/
 ## ⚠️ Catatan Penting
 
 - **User harus sedang live** untuk bisa connect
+- **Pastikan username benar** — username salah akan ditolak API TikTok (`user_not_found`)
 - Koneksi otomatis terputus jika live berakhir
 - Maksimum **200 pesan** disimpan di frontend (FIFO)
-- Beberapa streamer mungkin membatasi akses via API TikTok
+- Koneksi memakai jalur gratis Euler Stream (plan Community); fitur premium seperti katalog gift lengkap membutuhkan API key — set env `SIGN_API_KEY` jika tersedia
 
 ## 🎨 Customization
 
