@@ -2,7 +2,7 @@ const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const { Server } = require('socket.io');
-const { WebcastPushConnection } = require('tiktok-live-connector');
+const { TikTokLiveConnection } = require('tiktok-live-connector');
 const { v4: uuidv4 } = require('uuid');
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -90,39 +90,26 @@ app.prepare().then(() => {
       // Disconnect existing connection if any
       if (activeConnections.has(socket.id)) {
         try {
-          activeConnections.get(socket.id).disconnect();
+          await activeConnections.get(socket.id).disconnect();
         } catch (e) {}
         activeConnections.delete(socket.id);
       }
 
       socket.emit('status', { type: 'connecting', message: `Menghubungkan ke @${cleanUsername}...` });
 
-      // Create connection dengan opsi yang benar untuk menghindari error websocket
-      const tiktokConnection = new WebcastPushConnection(cleanUsername, {
+      // enableExtendedGiftInfo dimatikan: endpoint gift gallery butuh API key berbayar (Euler Stream Business).
+      // Nama gift tetap tersedia lewat data.gift.name dari proto.
+      const tiktokConnection = new TikTokLiveConnection(cleanUsername, {
         processInitialData: false,
-        enableExtendedGiftInfo: true,
-        requestPollingIntervalMs: 2000,
-        // Gunakan fetchRoomInfoOnConnect untuk mencegah koneksi ke room offline
+        enableExtendedGiftInfo: false,
+        // fetchRoomInfoOnConnect mencegah koneksi ke room offline
         fetchRoomInfoOnConnect: true,
-        // WebcastPushConnection akan otomatis fallback ke polling jika websocket gagal
-        webClientParams: {
-          app_language: 'id-ID',
-          device_platform: 'web',
-        },
-        webClientHeaders: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
       });
 
       activeConnections.set(socket.id, tiktokConnection);
 
       // Store roomId for webhook
       let roomId = null;
-
-      // Setup event listeners BEFORE connect
-      tiktokConnection.on('connecting', () => {
-        console.log('[TikTok] connecting event triggered');
-      });
 
       tiktokConnection.on('error', (err) => {
         console.error('[TikTok] error event:', err);
@@ -136,7 +123,7 @@ app.prepare().then(() => {
           message: 'Timeout: Gagal terhubung dalam 15 detik. User mungkin tidak sedang live.',
         });
         activeConnections.delete(socket.id);
-        try { tiktokConnection.disconnect(); } catch (e) {}
+        try { tiktokConnection.disconnect().catch(() => {}); } catch (e) {}
       }, 15000);
 
       try {
@@ -146,21 +133,12 @@ app.prepare().then(() => {
         roomId = state.roomId; // Store roomId for later use
         console.log(`[TikTok] ✓ Connected to room: ${state.roomId} for user: ${cleanUsername}`);
 
-        // Extract stream URL dari roomInfo
-        let streamUrl = null;
-        console.log('[TikTok] roomInfo keys:', state.roomInfo ? Object.keys(state.roomInfo) : 'null');
-
-        if (state.roomInfo) {
-          if (state.roomInfo.stream_url) {
-            console.log('[TikTok] stream_url keys:', Object.keys(state.roomInfo.stream_url));
-            console.log('[TikTok] stream_url:', JSON.stringify(state.roomInfo.stream_url, null, 2));
-            streamUrl = state.roomInfo.stream_url.rtmp_pull_url ||
-                        state.roomInfo.stream_url.hls_pull_url ||
-                        state.roomInfo.stream_url.live_core_sdk_data?.pull_data?.stream_data || null;
-          } else {
-            console.log('[TikTok] No stream_url in roomInfo');
-          }
-        }
+        // Extract stream URL dari roomInfo (di v2 berada di roomInfo.data.stream_url)
+        const streamData = state.roomInfo?.data?.stream_url;
+        const streamUrl = streamData?.rtmp_pull_url ||
+                          streamData?.hls_pull_url ||
+                          streamData?.live_core_sdk_data?.pull_data?.stream_data || null;
+        console.log('[TikTok] Stream URL:', streamUrl ? 'found' : 'not found');
 
         console.log('[TikTok] Final Stream URL:', streamUrl);
 
@@ -193,19 +171,19 @@ app.prepare().then(() => {
         return;
       }
 
-      // Forward chat messages - struktur data sesuai dengan WebcastPushConnection
+      // Forward chat messages (v2: data nested di data.user, teks chat di data.content)
       tiktokConnection.on('chat', (data) => {
-        console.log('[TikTok] chat event received:', data);
+        console.log('[TikTok] chat event received:', data.user?.displayId, ':', data.content);
 
         const chatPayload = {
           type: 'chat',
           roomId: roomId,
           data: {
             id: uuidv4(),
-            uniqueId: data.uniqueId || 'unknown',
-            nickname: data.nickname || data.uniqueId || 'Unknown',
-            comment: data.comment || '',
-            profilePictureUrl: data.profilePictureUrl || '',
+            uniqueId: data.user?.displayId || data.user?.uniqueId || 'unknown',
+            nickname: data.user?.nickname || data.user?.displayId || 'Unknown',
+            comment: data.content || '',
+            profilePictureUrl: data.user?.avatarThumb?.urlList?.[0] || '',
             timestamp: Date.now(),
           },
         };
@@ -219,11 +197,11 @@ app.prepare().then(() => {
         sendWebhook(webhookUrl, chatPayload);
       });
 
-      // Forward gifts
+      // Forward gifts (v2: nama gift dari data.gift.name, streak ditandai data.gift.combo)
       tiktokConnection.on('gift', (data) => {
-        console.log('[TikTok] gift event received:', data);
-        // Skip streak in progress
-        if (data.giftType === 1 && !data.repeatEnd) {
+        console.log('[TikTok] gift event received:', data.user?.displayId, data.gift?.name, data.repeatCount);
+        // Skip streak (combo) yang masih berjalan, kirim saat selesai
+        if (data.gift?.combo && !data.repeatEnd) {
           return;
         }
 
@@ -232,11 +210,11 @@ app.prepare().then(() => {
           roomId: roomId,
           data: {
             id: uuidv4(),
-            uniqueId: data.uniqueId || 'unknown',
-            nickname: data.nickname || data.uniqueId || 'Unknown',
-            giftName: data.giftName || 'Gift',
-            repeatCount: data.repeatCount || 1,
-            profilePictureUrl: data.profilePictureUrl || '',
+            uniqueId: data.user?.displayId || data.user?.uniqueId || 'unknown',
+            nickname: data.user?.nickname || data.user?.displayId || 'Unknown',
+            giftName: data.gift?.name || 'Gift',
+            repeatCount: data.repeatCount || data.groupCount || 1,
+            profilePictureUrl: data.user?.avatarThumb?.urlList?.[0] || '',
             timestamp: Date.now(),
           },
         };
@@ -249,26 +227,26 @@ app.prepare().then(() => {
         sendWebhook(webhookUrl, giftPayload);
       });
 
-      // Forward likes
+      // Forward likes (v2: jumlah like di data.count, total di data.total)
       tiktokConnection.on('like', (data) => {
-        console.log('[TikTok] like event received:', data);
+        console.log('[TikTok] like event received:', data.user?.displayId, data.count);
         socket.emit('new-like', {
-          uniqueId: data.uniqueId || 'unknown',
-          nickname: data.nickname || 'Unknown',
-          likeCount: data.likeCount || 1,
-          totalLikeCount: data.totalLikeCount || 0,
+          uniqueId: data.user?.displayId || data.user?.uniqueId || 'unknown',
+          nickname: data.user?.nickname || 'Unknown',
+          likeCount: data.count || 1,
+          totalLikeCount: Number(data.total) || 0,
         });
       });
 
-      // Forward viewer count
+      // Forward viewer count (v2: jumlah penonton di data.total)
       tiktokConnection.on('roomUser', (data) => {
-        console.log('[TikTok] roomUser event received, viewerCount:', data.viewerCount);
-        socket.emit('viewer-count', { viewerCount: data.viewerCount || 0 });
+        console.log('[TikTok] roomUser event received, viewerCount:', data.total);
+        socket.emit('viewer-count', { viewerCount: Number(data.total) || 0 });
       });
 
       // Handle member join
       tiktokConnection.on('member', (data) => {
-        console.log('[TikTok] member event:', data.user?.uniqueId || 'user joined');
+        console.log('[TikTok] member event:', data.user?.displayId || data.user?.nickname || 'user joined');
       });
 
       // Handle disconnect
@@ -282,7 +260,7 @@ app.prepare().then(() => {
     socket.on('leave-room', () => {
       if (activeConnections.has(socket.id)) {
         try {
-          activeConnections.get(socket.id).disconnect();
+          activeConnections.get(socket.id).disconnect().catch(() => {});
         } catch (e) {}
         activeConnections.delete(socket.id);
         socket.emit('status', { type: 'disconnected', message: 'Berhasil keluar dari room.' });
@@ -293,7 +271,7 @@ app.prepare().then(() => {
       console.log(`[Socket] Client disconnected: ${socket.id}`);
       if (activeConnections.has(socket.id)) {
         try {
-          activeConnections.get(socket.id).disconnect();
+          activeConnections.get(socket.id).disconnect().catch(() => {});
         } catch (e) {}
         activeConnections.delete(socket.id);
       }

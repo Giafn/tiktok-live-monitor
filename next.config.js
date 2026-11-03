@@ -1,7 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ['p16-sign-sg.tiktokcdn.com', 'p77-sign-sg.tiktokcdn.com', 'p16-sign.tiktokcdn-us.com'],
+    remotePatterns: [
+      { hostname: 'p16-sign-sg.tiktokcdn.com' },
+      { hostname: 'p77-sign-sg.tiktokcdn.com' },
+      { hostname: 'p16-sign.tiktokcdn-us.com' },
+    ],
   },
 };
 
