@@ -201,3 +201,5 @@ const MAX_FEED = 200; // Ganti angka sesuai kebutuhan
 ## 📄 License
 
 MIT
+
+See [WEBHOOK_DOCS.md](WEBHOOK_DOCS.md) for webhook integration details.
